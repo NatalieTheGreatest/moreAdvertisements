@@ -200,23 +200,79 @@ function findWhiteSpacesGrid() {
     return whitespaces;
   }
   
-  // Combine strategies
+  // Ensure they are not too large
+  function subdivideSpaces(spaces) {
+    const maxWidth = 300; // Maximum width for an ad
+    const maxHeight = 250; // Maximum height for an ad
+    const result = [];
+    
+    spaces.forEach(space => {
+      // If space is too wide, split horizontally
+      if (space.width > maxWidth * 1.5) {
+        const columns = Math.floor(space.width / maxWidth);
+        const columnWidth = Math.floor(space.width / columns);
+        
+        for (let i = 0; i < columns; i++) {
+          result.push({
+            left: space.left + (i * columnWidth),
+            top: space.top,
+            width: columnWidth,
+            height: Math.min(space.height, maxHeight)
+          });
+        }
+      } 
+      // If space is too tall, split vertically
+      else if (space.height > maxHeight * 1.5) {
+        const rows = Math.floor(space.height / maxHeight);
+        const rowHeight = Math.floor(space.height / rows);
+        
+        for (let i = 0; i < rows; i++) {
+          result.push({
+            left: space.left,
+            top: space.top + (i * rowHeight),
+            width: Math.min(space.width, maxWidth),
+            height: rowHeight
+          });
+        }
+      } 
+      // Otherwise just limit the size
+      else {
+        result.push({
+          left: space.left,
+          top: space.top,
+          width: Math.min(space.width, maxWidth),
+          height: Math.min(space.height, maxHeight)
+        });
+      }
+    });
+    
+    return result;
+  }
+
   function findWhiteSpaces() {
     // Try grid-based detection first
     let spaces = findWhiteSpacesGrid();
     
     // If grid method didn't find enough spaces, try margin analysis
     if (spaces.length < 2) {
+      console.log("Trying to find margin")
       spaces = spaces.concat(findWhiteSpacesMargins());
     }
     
     // If we still need more ad spaces, use fixed positions
     if (spaces.length < 3) {
+       console.log("Trying to find fixed position")
       spaces = spaces.concat(findFixedPositionWhitespaces());
     }
     
     // Filter out overlapping spaces
-    return filterOverlappingSpaces(spaces);
+    spaces = filterOverlappingSpaces(spaces);
+    
+    // Break up large spaces into smaller ones
+    spaces = subdivideSpaces(spaces);
+    
+    console.log("Final ad spaces:", spaces);
+    return spaces;
   }
   
   // Helper function to remove overlapping whitespaces
