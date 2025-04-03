@@ -1,35 +1,28 @@
+let processedPageHeight = window.innerHeight;
 
-document.addEventListener('DOMContentLoaded', () => {
+  
+
+  //region event listeners
+
+
+    document.addEventListener('DOMContentLoaded', () => {
     // Find empty spaces on the page
     findEmptySpaces();
   });
 
-  function debounce(func, wait) {
-    let timeout;
-    return function() {
-      clearTimeout(timeout);
-      timeout = setTimeout(func, wait);
-    };
-  }
-  
-  // Change DOMContentLoaded to window.onload
   window.addEventListener('load', () => {
-    // Add a slight delay to make sure everything is rendered
+    // Add a slight delay to allow for dynamic content to render
     setTimeout(() => {
-      findEmptySpaces();
-    }, 500);
+      const whitespaces = findWhiteSpaces();
+      whitespaces.forEach(space => {
+        insertAd(space);
+      });
+      
+      // Initialize the processed height to include what we've already seen
+      processedPageHeight = window.innerHeight;
+    }, 1000);
   });
-  
-  
-  function findEmptySpaces() {
-    console.log("Finding empty spaces...");
-    const emptySpaces = findWhiteSpaces();
-    console.log(`Found ${emptySpaces.length} empty spaces:`, emptySpaces);
-    // For each empty space, insert an ad
-    emptySpaces.forEach(space => {
-      insertAd(space);
-    });
-  }
+
 
   // We must be responsive
   window.addEventListener('resize', debounce(() => {
@@ -43,6 +36,221 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }, 500));
   
+
+  window.addEventListener('scroll', debounce(() => {
+    const currentScrollY = window.scrollY;
+    const viewportHeight = window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+    
+    // Only process if we've scrolled to new territory
+    if (currentScrollY + viewportHeight > processedPageHeight) {
+      console.log("Checking for new whitespaces after scrolling...");
+      
+      // Update how far we've processed
+      processedPageHeight = currentScrollY + viewportHeight;
+      
+      // Find new whitespaces but only in the newly visible area
+      const newWhitespaces = findWhiteSpacesInRange(
+        currentScrollY - 100, // A bit above current scroll position
+        processedPageHeight + 200 // A bit below the visible area
+      );
+      
+      console.log(`Found ${newWhitespaces.length} new spaces after scrolling`);
+      
+      // Insert ads in the new spaces
+      newWhitespaces.forEach(space => {
+        insertAd(space);
+      });
+    }
+  }, 500));
+
+  
+  //endregion
+
+  function debounce(func, wait) {
+    let timeout;
+    return function() {
+      clearTimeout(timeout);
+      timeout = setTimeout(func, wait);
+    };
+  }
+  
+  function findEmptySpaces() {
+    console.log("Finding empty spaces...");
+    const emptySpaces = findWhiteSpaces();
+    console.log(`Found ${emptySpaces.length} empty spaces:`, emptySpaces);
+    // For each empty space, insert an ad
+    emptySpaces.forEach(space => {
+      insertAd(space);
+    });
+  }
+
+  // Modified whitespace finder that only looks in a specific vertical range
+function findWhiteSpacesInRange(topBound, bottomBound) {
+    // Try grid-based detection first but only in the specified range
+    let spaces = findWhiteSpacesGridInRange(topBound, bottomBound);
+    
+    // If grid method didn't find enough spaces, try margin analysis
+    if (spaces.length < 2) {
+      spaces = spaces.concat(findWhiteSpacesMarginsInRange(topBound, bottomBound));
+    }
+    
+    // Filter out overlapping spaces
+    spaces = filterOverlappingSpaces(spaces);
+    
+    // Break up large spaces into smaller ones
+    spaces = subdivideSpaces(spaces);
+    
+    return spaces;
+  }
+
+
+  // Modified grid-based whitespace detection that looks only in a specific vertical range
+function findWhiteSpacesGridInRange(topBound, bottomBound) {
+    const whitespaces = [];
+    const gridSize = 50; // Size of each grid cell in pixels
+    const minAdSize = 100; // Minimum size for an ad to be worth placing
+    
+    // Create a grid representing only the viewport range we're interested in
+    const viewportWidth = window.innerWidth;
+    const rangeHeight = bottomBound - topBound;
+    
+    // Convert bounds to grid coordinates
+    const startRow = Math.floor(topBound / gridSize);
+    const endRow = Math.ceil(bottomBound / gridSize);
+    const numRows = endRow - startRow;
+    
+    // Create a 2D array to track occupied spaces
+    const grid = Array(numRows).fill()
+      .map(() => Array(Math.ceil(viewportWidth / gridSize)).fill(false));
+    
+    // Mark grid cells that contain DOM elements
+    const elements = document.querySelectorAll('*');
+    elements.forEach(element => {
+      if (element.className === 'extension-added-ad') return; // Skip our own ads
+      
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return; // Skip invisible elements
+      
+      // Convert viewport coordinates to page coordinates
+      const absoluteTop = rect.top + window.scrollY;
+      const absoluteBottom = rect.bottom + window.scrollY;
+      
+      // Skip if element is outside our range
+      if (absoluteBottom < topBound || absoluteTop > bottomBound) return;
+      
+      // Mark cells occupied by this element
+      const elementStartRow = Math.max(0, Math.floor((absoluteTop - topBound) / gridSize));
+      const elementEndRow = Math.min(numRows - 1, Math.ceil((absoluteBottom - topBound) / gridSize));
+      const startCol = Math.max(0, Math.floor(rect.left / gridSize));
+      const endCol = Math.min(grid[0].length - 1, Math.ceil(rect.right / gridSize));
+      
+      for (let row = elementStartRow; row <= elementEndRow; row++) {
+        for (let col = startCol; col <= endCol; col++) {
+          if (row >= 0 && row < grid.length) {
+            grid[row][col] = true;
+          }
+        }
+      }
+    });
+    
+    // Find contiguous empty regions (similar to your original code)
+    for (let row = 0; row < grid.length; row++) {
+      for (let col = 0; col < grid[0].length; col++) {
+        if (grid[row][col]) continue; // Skip occupied cells
+        
+        // Expand to find the largest empty rectangle starting at this cell
+        let width = 1;
+        let height = 1;
+        
+        // Expand horizontally
+        while (col + width < grid[0].length && !grid[row][col + width]) {
+          width++;
+        }
+        
+        // Expand vertically
+        let canExpandVertically = true;
+        while (canExpandVertically && row + height < grid.length) {
+          for (let c = col; c < col + width; c++) {
+            if (grid[row + height][c]) {
+              canExpandVertically = false;
+              break;
+            }
+          }
+          if (canExpandVertically) height++;
+        }
+        
+        // Convert back to pixel dimensions and adjust for the range offset
+        const pixelWidth = width * gridSize;
+        const pixelHeight = height * gridSize;
+        
+        // Only add if space is large enough
+        if (pixelWidth >= minAdSize && pixelHeight >= minAdSize) {
+          whitespaces.push({
+            left: col * gridSize,
+            top: (row + startRow) * gridSize, // Adjust back to page coordinates
+            width: pixelWidth,
+            height: pixelHeight
+          });
+          
+          // Mark this area as occupied to avoid overlapping ads
+          for (let r = row; r < row + height; r++) {
+            for (let c = col; c < col + width; c++) {
+              if (r < grid.length) {
+                grid[r][c] = true;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return whitespaces;
+  }
+  
+  // Modified margin analysis for the specified range
+  function findWhiteSpacesMarginsInRange(topBound, bottomBound) {
+    const whitespaces = [];
+    const elements = document.querySelectorAll('body > *');
+    const minMargin = 40; // Minimum margin size to consider
+    
+    elements.forEach(element => {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      
+      // Convert viewport coordinates to page coordinates
+      const absoluteTop = rect.top + window.scrollY;
+      const absoluteBottom = rect.bottom + window.scrollY;
+      
+      // Skip if element is outside our range
+      if (absoluteBottom < topBound || absoluteTop > bottomBound) return;
+      
+      // Check right margin
+      const rightMargin = parseInt(style.marginRight);
+      if (rightMargin >= minMargin) {
+        whitespaces.push({
+          left: rect.right,
+          top: absoluteTop,
+          width: rightMargin,
+          height: rect.height
+        });
+      }
+      
+      // Check bottom margin
+      const bottomMargin = parseInt(style.marginBottom);
+      if (bottomMargin >= minMargin) {
+        whitespaces.push({
+          left: rect.left,
+          top: absoluteBottom,
+          width: rect.width,
+          height: bottomMargin
+        });
+      }
+    });
+    
+    return whitespaces;
+  }
+
 
 // Strategy 1: Grid-based approach
 function findWhiteSpacesGrid() {
