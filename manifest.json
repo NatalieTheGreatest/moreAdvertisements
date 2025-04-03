@@ -10,12 +10,16 @@
         "js": ["content.js"]
       }
     ],
+    "web_accessible_resources": [{
+  "resources": ["images/add1.png", "images/add2.png", "images/add3.png"],
+  "matches": ["<all_urls>"]
+    }],
     "action": {
       "default_popup": "popup.html",
       "default_icon": {
-        "16": "images/icon16.png",
-        "48": "images/icon48.png",
-        "128": "images/icon128.png"
+        "16": "images/icon-16.png",
+        "48": "images/icon-48.png",
+        "128": "images/icon-128.png"
       }
     }
   }
