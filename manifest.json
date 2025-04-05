@@ -11,8 +11,8 @@
       }
     ],
     "web_accessible_resources": [{
-  "resources": ["images/add1.png", "images/add2.png", "images/add3.png"],
-  "matches": ["<all_urls>"]
+    "resources": ["images/add1.png", "images/add2.png", "images/add4.png", "images/add5.png", "images/add6.png", "images/add3.png"],
+    "matches": ["<all_urls>"]
     }],
     "action": {
       "default_popup": "popup.html",

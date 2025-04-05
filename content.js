@@ -1,7 +1,7 @@
 let processedPageHeight = window.innerHeight;
 
   
-const adImages = ['images/add1.png', 'images/add2.png', 'images/add3.png']; // These are all stolen images from walmart.com
+const adImages = ["images/add1.png", "images/add2.png", "images/add4.png", "images/add5.png", "images/add6.png", "images/add3.png"]; // These are all stolen images from walmart.com
 const adLink = 'https://www.walmart.com/'; // Send them to the home page
 
   
